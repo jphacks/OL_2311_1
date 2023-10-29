@@ -7,9 +7,17 @@
 #include <IRrecv.h>
 #include <IRsend.h>
 #include <M5Capsule.h>
+#include <FastLED.h>
 
 #define BUFFER 64
 #define sw_pin 5
+#define LED_PIN     7
+#define NUM_LEDS    9
+#define CHIPSET     WS2811
+#define COLOR_ORDER GRB
+CRGB leds[NUM_LEDS];
+#define BRIGHTNESS  128
+#define RAINBOW_DURATION 1500
 const uint16_t receiverPin = 9;
 const uint16_t transmitterPin = 4;
 
@@ -30,7 +38,7 @@ std::string rxValue = "000001";
 #define CHARACTERISTIC_UUID_RX "6E400002-B5A3-F393-E0A9-E50E24DCCA9E"
 #define CHARACTERISTIC_UUID_TX "6E400003-B5A3-F393-E0A9-E50E24DCCA9E"
 
-int buttonState = 0;
+int sw_in = 0;
 
 class MyServerCallbacks : public BLEServerCallbacks {
     void onConnect(BLEServer *pServer) {
@@ -88,9 +96,37 @@ void setup() {
     M5Capsule.begin(cfg);
 
     pinMode(sw_pin, INPUT_PULLUP);
+    FastLED.addLeds<CHIPSET, LED_PIN, COLOR_ORDER>(leds, NUM_LEDS).setCorrection( TypicalSMD5050 );
+    FastLED.setBrightness(BRIGHTNESS);
+}
+
+void fill_solidled(CRGB* leds, int num_leds, CRGB color) {
+  for (int i = 0; i < num_leds; i++) {
+    leds[i] = color;
+  }
+}
+
+void rainbowEffect() {
+  static uint8_t starthue = random(256);
+  unsigned long startTime = millis();
+  
+  while (millis() - startTime < RAINBOW_DURATION) {
+    fill_rainbow(leds, NUM_LEDS, starthue, 20);
+    FastLED.show();
+    FastLED.delay(8);
+    starthue++;
+  }
+
+  // 虹色の効果が終了したらすべてのLEDを青色に設定
+  fill_solidled(leds, NUM_LEDS, CRGB::Blue);
+  FastLED.show();
 }
 
 void loop() {
+    float gx, gy, gz;
+    M5.Imu.getGyro(&gx, &gy, &gz);
+    sw_in = digitalRead(sw_pin);
+
     if (irrecv.decode(&results)) {
         // 赤外線信号を受信した場合
         if (results.value  < 100000000 && results.value != 0 && results.value != receivedmyCode) {
@@ -113,12 +149,11 @@ void loop() {
     }
 
     if (deviceConnected && receivedmyCode != 0) {
-        int reading = digitalRead(sw_pin);
-        if (!reading) {
+        if (!sw_in && gx >= 50) {
             Serial.print("Re-sending IR code: 0x");
             Serial.println(receivedmyCode, HEX);
             irsend.sendNEC(receivedmyCode, 32);
-            delay(1000);
+            rainbowEffect();
         }
     }
 }
