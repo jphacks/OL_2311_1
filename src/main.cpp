@@ -26,6 +26,7 @@ IRsend irsend(transmitterPin);
 decode_results results;
 uint64_t receivedmyCode;
 uint64_t receivedfdCode;
+uint8_t txValue[BUFFER] = "";
 
 BLEServer *pServer = NULL;
 BLECharacteristic *pTxCharacteristic;
@@ -126,6 +127,13 @@ void loop() {
     float gx, gy, gz;
     M5.Imu.getGyro(&gx, &gy, &gz);
     sw_in = digitalRead(sw_pin);
+
+    if(Serial.available() != 0)
+    {
+      size_t bufSize = Serial.read(txValue, Serial.available());
+      pTxCharacteristic->setValue(txValue, bufSize);
+      pTxCharacteristic->notify();
+    }
 
     if (irrecv.decode(&results)) {
         // 赤外線信号を受信した場合
