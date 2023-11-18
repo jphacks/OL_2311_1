@@ -35,6 +35,8 @@ bool oldDeviceConnected = false;
 std::string txValue = "000000";
 std::string rxValue = "000001";
 
+CRGB ledColor;
+
 #define SERVICE_UUID           "6E400001-B5A3-F393-E0A9-E50E24DCCA9E"
 #define CHARACTERISTIC_UUID_RX "6E400002-B5A3-F393-E0A9-E50E24DCCA9E"
 #define CHARACTERISTIC_UUID_TX "6E400003-B5A3-F393-E0A9-E50E24DCCA9E"
@@ -56,9 +58,27 @@ class MyCallbacks : public BLECharacteristicCallbacks {
         rxValue = pCharacteristic->getValue();
 
         if (rxValue.length() > 0) {
-            //rxValue = "BB9BB9";
             Serial.print("Received Value: ");
             Serial.println(rxValue.c_str());
+            std::string color;
+
+            if (rxValue[0] == 'A') {
+                ledColor = CRGB::Green;
+                color = "green";
+            } else if (rxValue[0] == 'B') {
+                ledColor = CRGB::Aqua;
+                color = "aqua";
+            } else if (rxValue[0] == 'C') {
+                ledColor = CRGB::Purple;
+                color = "purple";
+            } else {
+                ledColor = CRGB::Red;
+                color = "red";
+            } 
+
+            Serial.print("color: ");
+            Serial.println(color.c_str());
+
             receivedmyCode = strtoull(rxValue.c_str(), NULL, 16);
         }
     }
@@ -121,9 +141,14 @@ void rainbowEffect() {
   }
 
   // 虹色の効果が終了したらすべてのLEDを青色に設定
-  fill_solidled(leds, NUM_LEDS, CRGB::Blue);
+  fill_solidled(leds, NUM_LEDS, ledColor);
   FastLED.show();
   FastLED.delay(10);
+}
+
+void changeColor() {
+  fill_solidled(leds, NUM_LEDS, ledColor);
+  FastLED.show();
 }
 
 void loop() {
@@ -151,16 +176,16 @@ void loop() {
         irrecv.resume();
     }
 
-    //if (deviceConnected){
-        //if (receivedmyCode != 0) {
+    if (deviceConnected){
+        if (receivedmyCode != 0) {
             if (!sw_in) {// && gx >= 50) {
                 Serial.print("Re-sending IR code: 0x");
                 Serial.println(receivedmyCode, HEX);
                 irsend.sendNEC(receivedmyCode, 32);
                 rainbowEffect();
             }
-        //}
-    //}
+        }
+    }
 
     M5Capsule.update();
     if (M5Capsule.BtnA.wasPressed()) {
