@@ -12,8 +12,8 @@
 #define BUFFER 64
 #define sw_pin 5
 #define LED_PIN     7
-#define NUM_LEDS    9
-#define CHIPSET     WS2811
+#define NUM_LEDS    10
+#define CHIPSET     SK6812
 #define COLOR_ORDER GRB
 CRGB leds[NUM_LEDS];
 #define BRIGHTNESS  128
@@ -32,6 +32,7 @@ BLECharacteristic *pTxCharacteristic;
 BLECharacteristic *pRxCharacteristic;
 bool deviceConnected = false;
 bool oldDeviceConnected = false;
+std::string txValue = "000000";
 std::string rxValue = "000001";
 
 #define SERVICE_UUID           "6E400001-B5A3-F393-E0A9-E50E24DCCA9E"
@@ -55,6 +56,7 @@ class MyCallbacks : public BLECharacteristicCallbacks {
         rxValue = pCharacteristic->getValue();
 
         if (rxValue.length() > 0) {
+            //rxValue = "BB9BB9";
             Serial.print("Received Value: ");
             Serial.println(rxValue.c_str());
             receivedmyCode = strtoull(rxValue.c_str(), NULL, 16);
@@ -64,6 +66,7 @@ class MyCallbacks : public BLECharacteristicCallbacks {
 
 void setup() {
     Serial.begin(115200);
+    Serial.println("Start");
 
     BLEDevice::init("BLE UART");
 
@@ -101,7 +104,7 @@ void setup() {
 }
 
 void fill_solidled(CRGB* leds, int num_leds, CRGB color) {
-  for (int i = 0; i < num_leds; i++) {
+  for (int i = -1; i < num_leds; i++) {
     leds[i] = color;
   }
 }
@@ -120,6 +123,7 @@ void rainbowEffect() {
   // 虹色の効果が終了したらすべてのLEDを青色に設定
   fill_solidled(leds, NUM_LEDS, CRGB::Blue);
   FastLED.show();
+  FastLED.delay(10);
 }
 
 void loop() {
@@ -132,28 +136,34 @@ void loop() {
         if (results.value  < 100000000 && results.value != 0 && results.value != receivedmyCode) {
             Serial.print("Received IR code: 0x");
             Serial.println(results.value, HEX);
-            
             // 受信した赤外線コードをBLE経由で送信
             char irCodeStr[17];
             snprintf(irCodeStr, 17, "%016llX", results.value);
             // 余分な0を削除
             int startIndex = 0;
-            while (irCodeStr[startIndex] == '0' && startIndex < 15) {
-                startIndex++;
-            }
+            while (irCodeStr[startIndex] == '0' && startIndex < 15) startIndex++;
             pTxCharacteristic->setValue(irCodeStr + startIndex);
+            //txValue = "MSNF3V";
+            //pTxCharacteristic->setValue(txValue);
             pTxCharacteristic->notify();
             delay(1000);
         }
         irrecv.resume();
     }
 
-    if (deviceConnected && receivedmyCode != 0) {
-        if (!sw_in && gx >= 50) {
-            Serial.print("Re-sending IR code: 0x");
-            Serial.println(receivedmyCode, HEX);
-            irsend.sendNEC(receivedmyCode, 32);
-            rainbowEffect();
-        }
+    //if (deviceConnected){
+        //if (receivedmyCode != 0) {
+            if (!sw_in) {// && gx >= 50) {
+                Serial.print("Re-sending IR code: 0x");
+                Serial.println(receivedmyCode, HEX);
+                irsend.sendNEC(receivedmyCode, 32);
+                rainbowEffect();
+            }
+        //}
+    //}
+
+    M5Capsule.update();
+    if (M5Capsule.BtnA.wasPressed()) {
+        M5Capsule.Power.powerOff();
     }
 }
